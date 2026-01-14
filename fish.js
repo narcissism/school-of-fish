@@ -152,6 +152,23 @@ class Fish {
     if (this.y < margin) this.applyForce(0, turn);
     if (this.y > height - margin) this.applyForce(0, -turn);
   }
+  
+  avoidMouse() {
+  if (mouse.x === null) return;
+
+  const dx = this.x - mouse.x;
+  const dy = this.y - mouse.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist < mouse.radius && dist > 0) {
+    const strength = (1 - dist / mouse.radius) * 0.15;
+    this.applyForce(
+      (dx / dist) * strength,
+      (dy / dist) * strength
+    );
+  }
+}
+
 
   update() {
     this.vx += this.ax;
@@ -170,6 +187,8 @@ class Fish {
     this.ay = 0;
 
     this.avoidWalls();
+    this.avoidMouse();
+
   }
 
   draw() {
