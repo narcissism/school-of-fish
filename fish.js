@@ -1,22 +1,63 @@
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-let width, height;
+let width, height, dpr;
+
 function resize() {
-  width = canvas.width = window.innerWidth;
-  height = canvas.height = window.innerHeight;
+  dpr = window.devicePixelRatio || 1;
+  width = window.innerWidth;
+  height = window.innerHeight;
+
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  canvas.style.width = width + "px";
+  canvas.style.height = height + "px";
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 window.addEventListener("resize", resize);
 resize();
+
+/* =========================
+   BACKGROUND TEXTURE
+========================= */
+
+function drawBackground() {
+  // Base ocean color
+  ctx.fillStyle = "#0a2540";
+  ctx.fillRect(0, 0, width, height);
+
+  // Soft noise / light texture
+  ctx.fillStyle = "rgba(255,255,255,0.03)";
+  for (let i = 0; i < 400; i++) {
+    const x = Math.random() * width;
+    const y = Math.random() * height;
+    const r = Math.random() * 2;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Subtle depth gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, height);
+  grad.addColorStop(0, "rgba(255,255,255,0.04)");
+  grad.addColorStop(1, "rgba(0,0,0,0.2)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+}
+
+/* =========================
+   FISH SYSTEM
+========================= */
 
 const fishCount = 120;
 const fishes = [];
 
 const perceptionRadius = 70;
-const separationRadius = 22;
+const separationRadius = 26;
 
-const maxSpeed = 2.2;
-const maxForce = 0.05;
+const maxSpeed = 2;
+const maxForce = 0.06;
 
 class Fish {
   constructor() {
@@ -28,40 +69,9 @@ class Fish {
     this.ay = 0;
   }
 
-  applyForce(fx, fy) {
-    this.ax += fx;
-    this.ay += fy;
-  }
-
-  update() {
-    this.vx += this.ax;
-    this.vy += this.ay;
-
-    // Limit speed
-    const speed = Math.hypot(this.vx, this.vy);
-    if (speed > maxSpeed) {
-      this.vx = (this.vx / speed) * maxSpeed;
-      this.vy = (this.vy / speed) * maxSpeed;
-    }
-
-    this.x += this.vx;
-    this.y += this.vy;
-
-    // Reset acceleration
-    this.ax = 0;
-    this.ay = 0;
-
-    this.avoidWalls();
-  }
-
-  avoidWalls() {
-    const margin = 80;
-    const turn = 0.08;
-
-    if (this.x < margin) this.applyForce(turn, 0);
-    if (this.x > width - margin) this.applyForce(-turn, 0);
-    if (this.y < margin) this.applyForce(0, turn);
-    if (this.y > height - margin) this.applyForce(0, -turn);
+  applyForce(x, y) {
+    this.ax += x;
+    this.ay += y;
   }
 
   flock(fishes) {
@@ -77,21 +87,17 @@ class Fish {
       const dy = other.y - this.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist < perceptionRadius) {
-        // Alignment
+      if (dist < perceptionRadius && dist > 0) {
         alignX += other.vx;
         alignY += other.vy;
 
-        // Cohesion
         cohX += other.x;
         cohY += other.y;
 
-        // Separation
-        if (dist < separationRadius && dist > 0) {
+        if (dist < separationRadius) {
           sepX -= dx / dist;
           sepY -= dy / dist;
         }
-
         count++;
       }
     }
@@ -102,21 +108,52 @@ class Fish {
       cohX = cohX / count - this.x;
       cohY = cohY / count - this.y;
 
-      this.applySteering(alignX, alignY, 0.5);
-      this.applySteering(cohX, cohY, 0.04);
-      this.applySteering(sepX, sepY, 0.9);
+      this.steer(alignX, alignY, 0.5);
+      this.steer(cohX, cohY, 0.05);
+      this.steer(sepX, sepY, 1.0);
     }
   }
 
-  applySteering(x, y, strength) {
+  steer(x, y, strength) {
     const mag = Math.hypot(x, y);
-    if (mag > 0) {
-      x = (x / mag) * maxSpeed - this.vx;
-      y = (y / mag) * maxSpeed - this.vy;
-      x = Math.max(-maxForce, Math.min(maxForce, x));
-      y = Math.max(-maxForce, Math.min(maxForce, y));
-      this.applyForce(x * strength, y * strength);
+    if (mag === 0) return;
+
+    x = (x / mag) * maxSpeed - this.vx;
+    y = (y / mag) * maxSpeed - this.vy;
+
+    x = Math.max(-maxForce, Math.min(maxForce, x));
+    y = Math.max(-maxForce, Math.min(maxForce, y));
+
+    this.applyForce(x * strength, y * strength);
+  }
+
+  avoidWalls() {
+    const margin = 100;
+    const turn = 0.08;
+
+    if (this.x < margin) this.applyForce(turn, 0);
+    if (this.x > width - margin) this.applyForce(-turn, 0);
+    if (this.y < margin) this.applyForce(0, turn);
+    if (this.y > height - margin) this.applyForce(0, -turn);
+  }
+
+  update() {
+    this.vx += this.ax;
+    this.vy += this.ay;
+
+    const speed = Math.hypot(this.vx, this.vy);
+    if (speed > maxSpeed) {
+      this.vx = (this.vx / speed) * maxSpeed;
+      this.vy = (this.vy / speed) * maxSpeed;
     }
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    this.ax = 0;
+    this.ay = 0;
+
+    this.avoidWalls();
   }
 
   draw() {
@@ -127,18 +164,44 @@ class Fish {
     ctx.rotate(angle);
 
     // Body
+    ctx.fillStyle = "#bde9ff";
     ctx.beginPath();
-    ctx.moveTo(14, 0);
-    ctx.quadraticCurveTo(0, 6, -10, 0);
-    ctx.quadraticCurveTo(0, -6, 14, 0);
-    ctx.fillStyle = "#9bdcff";
+    ctx.moveTo(16, 0);
+    ctx.quadraticCurveTo(2, 8, -10, 0);
+    ctx.quadraticCurveTo(2, -8, 16, 0);
     ctx.fill();
 
     // Tail
+    ctx.fillStyle = "#8fd0f0";
     ctx.beginPath();
     ctx.moveTo(-10, 0);
-    ctx.lineTo(-16, 5);
-    ctx.lineTo(-16, -5);
+    ctx.lineTo(-18, 6);
+    ctx.lineTo(-18, -6);
     ctx.closePath();
-    ctx.fillStyle =
+    ctx.fill();
 
+    ctx.restore();
+  }
+}
+
+for (let i = 0; i < fishCount; i++) {
+  fishes.push(new Fish());
+}
+
+/* =========================
+   ANIMATION LOOP
+========================= */
+
+function animate() {
+  drawBackground();
+
+  for (const fish of fishes) fish.flock(fishes);
+  for (const fish of fishes) {
+    fish.update();
+    fish.draw();
+  }
+
+  requestAnimationFrame(animate);
+}
+
+animate();
