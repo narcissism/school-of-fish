@@ -1,3 +1,17 @@
+let predatorMode = false;
+
+const predatorToggle = document.getElementById("predatorToggle");
+predatorToggle.addEventListener("change", () => {
+  predatorMode = predatorToggle.checked;
+
+  if (predatorMode && !predator) {
+    predator = new Predator();
+  }
+  if (!predatorMode) {
+    predator = null;
+  }
+});
+
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
@@ -166,6 +180,69 @@ class Fish {
       (dx / dist) * strength,
       (dy / dist) * strength
     );
+    avoidPredator(predator) {
+  if (!predator) return;
+
+  const dx = this.x - predator.x;
+  const dy = this.y - predator.y;
+  const dist = Math.hypot(dx, dy);
+
+  const fearRadius = 180;
+
+  if (dist < fearRadius && dist > 0) {
+    const strength = (1 - dist / fearRadius) * 0.35;
+    this.applyForce(
+      (dx / dist) * strength,
+      (dy / dist) * strength
+    );
+  }
+}
+
+  }
+}
+
+  let predator = null;
+class Predator {
+  constructor() {
+    this.x = width / 2;
+    this.y = height / 2;
+    this.vx = 1.2;
+    this.vy = 0.8;
+  }
+
+  update() {
+    // Slow drifting movement
+    this.x += this.vx;
+    this.y += this.vy;
+
+    if (this.x < 150 || this.x > width - 150) this.vx *= -1;
+    if (this.y < 150 || this.y > height - 150) this.vy *= -1;
+  }
+
+  draw() {
+    const angle = Math.atan2(this.vy, this.vx);
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(angle);
+
+    // Body
+    ctx.fillStyle = "#ffb347";
+    ctx.beginPath();
+    ctx.moveTo(40, 0);
+    ctx.quadraticCurveTo(10, 18, -24, 0);
+    ctx.quadraticCurveTo(10, -18, 40, 0);
+    ctx.fill();
+
+    // Tail
+    ctx.beginPath();
+    ctx.moveTo(-24, 0);
+    ctx.lineTo(-44, 16);
+    ctx.lineTo(-44, -16);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   }
 }
 
@@ -238,5 +315,10 @@ function animate() {
 
   requestAnimationFrame(animate);
 }
+if (predator) {
+  predator.update();
+  predator.draw();
+}
+
 
 animate();
