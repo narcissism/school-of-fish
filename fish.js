@@ -17,6 +17,22 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 resize();
+const mouse = {
+  x: null,
+  y: null,
+  radius: 120
+};
+
+window.addEventListener("mousemove", (e) => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+window.addEventListener("mouseleave", () => {
+  mouse.x = null;
+  mouse.y = null;
+});
+
 
 /* =========================
    BACKGROUND TEXTURE
